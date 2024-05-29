@@ -8,8 +8,9 @@ from tabulate import tabulate #pip install tabulate
 # Initialisation des variables
 #==============================================================
 ListeMails, ListeNoms, ListeTotalReviews,ListeScores = [],[],[],[]
-ListeIds,ListeIdRestoUnik,ListeAuteurAvis, ListeAuteurNotes, ListeAuteurNbNotes, ListeAvis, ListeDateAvis, ListeDateExp , ListeReply, ListeDateReply = [],[],[],[],[],[],[],[],[],[]
+ListeIdsAvis,ListeIds,ListeIdRestoUnik,ListeAuteurAvis, ListeAuteurNotes, ListeAuteurNbNotes, ListeAvis, ListeDateAvis, ListeDateExp , ListeReply, ListeDateReply = [],[],[],[],[],[],[],[],[],[],[]
 i=1 #compteur pages
+k=0 #compteur avis (pk)
 idResto=0 #identifiant restaurant
 page="INIT"
 
@@ -97,10 +98,12 @@ while page:
             for avis in liste_avis :
                 # Rattachement à l'Id Resto
                 ListeIdRestoUnik.append(idResto)
+                k+=1
+                ListeIdsAvis.append(k)
 
                 # Récupération du nom de l'auteur
                 auteur_avis = avis.find('span',class_='typography_heading-xxs__QKBS8 typography_appearance-default__AAY17').text.strip()
-				ListeAuteurAvis.append(auteur_avis)
+                ListeAuteurAvis.append(auteur_avis)
 
                 # Récupération de la date de l'avis
                 if (avis.find('div', attrs = {'class':'typography_body-m__xgxZ_ typography_appearance-subtle__8_H2l styles_datesWrapper__RCEKH'}) is  None) :
@@ -173,14 +176,14 @@ while page:
 #Fin programme : Impression du df des restaurants
 print('[DF RESTO GLOBAL]')
 df_resto_global = pd.DataFrame(list(zip(ListeIds, ListeNoms, ListeMails, ListeTotalReviews, ListeScores)), columns =['Id_Resto', 'Nom', 'Contact','Nb Avis','Score'])
-df_reviews = pd.DataFrame(list(zip(ListeIdRestoUnik,ListeAuteurAvis,ListeAuteurNbNotes,ListeAuteurNotes,ListeAvis,ListeDateAvis,ListeDateExp,ListeReply,ListeDateReply)), columns =['Id_Resto', 'Auteur', 'Nb Notes','Note','Avis','Date Avis','Date Experience','Reply','Date Reply'])
+df_reviews = pd.DataFrame(list(zip(ListeIdsAvis,ListeIdRestoUnik,ListeAuteurAvis,ListeAuteurNbNotes,ListeAuteurNotes,ListeAvis,ListeDateAvis,ListeDateExp,ListeReply,ListeDateReply)), columns =['Id_Avis','Id_Resto', 'Auteur', 'Nb Notes','Note','Avis','Date Avis','Date Experience','Reply','Date Reply'])
 #df_global=df_resto_global.merge(right=df_reviews,on = "Id_Resto", how='outer')
 #on ne conserve que les restaus avec avis
 df_global=df_resto_global.merge(right=df_reviews,on = "Id_Resto", how='inner')
 
-#Gestion des NAN
-#values_zero = {"Nb Avis": 0, "Nb Notes": 0}
-#df_global.fillna(value=values_zero)
+#Nettoyage
+df_reviews['Nb Notes']=df_reviews['Nb Notes'].str.replace(',','')
+df_resto_global['Nb Avis']=df_resto_global['Nb Avis'].str.replace(',','')
 
 
 #print(tabulate(df_resto, headers='keys', tablefmt='fancy_grid')) 
