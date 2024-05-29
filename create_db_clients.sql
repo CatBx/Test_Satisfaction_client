@@ -12,13 +12,13 @@ CONSTRAINT pk_id_resto PRIMARY KEY(id_resto)
 );
 
 create table avis(
-        id_avis SERIAL,
-        id_resto integer,
-        auteur varchar(100),
+        id_avis integer not null,
+        id_resto integer not null,
+        auteur varchar(100) not null,
         nb_notes integer,
-        note integer,
+        note integer not null,
         avis varchar(50000),
-        date_avis TIMESTAMP,
+        date_avis varchar(100),
         date_exp TIMESTAMP,
         reply varchar(50000),
         date_reply TIMESTAMP,

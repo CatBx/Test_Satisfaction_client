@@ -187,13 +187,13 @@ df_resto_global['Nb Avis']=df_resto_global['Nb Avis'].str.replace(',','')
 
 
 #print(tabulate(df_resto, headers='keys', tablefmt='fancy_grid')) 
-df_global.to_json('gb_restaurants_avis.json', orient = 'split', compression = 'infer', index = 'true')
-df_global.to_csv('gb_restaurants_avis.csv', sep=';',index=False)
+#df_global.to_json('gb_restaurants_avis.json', orient = 'split', compression = 'infer', index = 'true')
+#df_global.to_csv('gb_restaurants_avis.csv', sep=';',index=False)
 
 #df_resto_global.to_json('restaurants.json', orient = 'split', compression = 'infer', index = 'true')
-df_reviews.to_csv('restaurants_avis.csv', sep='#',index=False)
-df_resto_global.to_csv('restaurants.csv', sep='#',index=False)
-df_global.to_csv('gb_restaurants_avis.csv', sep=';',index=False)
+df_reviews.to_csv('/home/ubuntu/projet/output/restaurants_avis.csv', sep='#',index=False)
+df_resto_global.to_csv('/home/ubuntu/projet/output/restaurants.csv', sep='#',index=False)
+#df_global.to_csv('gb_restaurants_avis.csv', sep=';',index=False)
 
 #print(ListeNoms)
 #print(ListeScores)
