@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup as bs
+import lxml
 import requests
-import re
 import pandas as pd
 from tabulate import tabulate #pip install tabulate
 
@@ -184,6 +184,10 @@ df_global=df_resto_global.merge(right=df_reviews,on = "Id_Resto", how='inner')
 #Nettoyage
 df_reviews['Nb Notes']=df_reviews['Nb Notes'].str.replace(',','')
 df_resto_global['Nb Avis']=df_resto_global['Nb Avis'].str.replace(',','')
+#Suppression des retours chariots
+df_reviews['Avis'] = df_reviews['Avis'].apply(lambda x: x.replace('\r', ' ') if isinstance(x, str) else x)
+df_reviews['Reply'] = df_reviews['Reply'].apply(lambda x: x.replace('\r', ' ') if isinstance(x, str) else x)
+
 
 
 #print(tabulate(df_resto, headers='keys', tablefmt='fancy_grid')) 
@@ -191,8 +195,8 @@ df_resto_global['Nb Avis']=df_resto_global['Nb Avis'].str.replace(',','')
 #df_global.to_csv('gb_restaurants_avis.csv', sep=';',index=False)
 
 #df_resto_global.to_json('restaurants.json', orient = 'split', compression = 'infer', index = 'true')
-df_reviews.to_csv('/home/ubuntu/projet/output/restaurants_avis.csv', sep='#',index=False)
-df_resto_global.to_csv('/home/ubuntu/projet/output/restaurants.csv', sep='#',index=False)
+df_reviews.to_csv('/app/raw_data/restaurants_avis.csv', sep='#',index=False)
+df_resto_global.to_csv('/app/raw_data/restaurants.csv', sep='#',index=False)
 #df_global.to_csv('gb_restaurants_avis.csv', sep=';',index=False)
 
 #print(ListeNoms)

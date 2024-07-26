@@ -1,6 +1,6 @@
-drop database clients;
-create database clients;
-\c clients;
+drop database if exists dst_satisfaction_clients;
+create database dst_satisfaction_clients;
+\c dst_satisfaction_clients;
 
 create table restaurants(
         id_resto integer,
@@ -26,4 +26,4 @@ CONSTRAINT pk_id_avis PRIMARY KEY(id_avis),
 CONSTRAINT fk_id_resto FOREIGN KEY(id_resto) REFERENCES restaurants(id_resto)
 );
 
-\q
+
