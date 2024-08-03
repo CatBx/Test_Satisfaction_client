@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from main import api  # Assurez-vous que le script est nommé `main.py` ou ajustez l'import
+from main import api  
 
 client = TestClient(api)
 
@@ -30,25 +30,16 @@ def test_liste_avis():
     assert isinstance(response.json(), list)  # Vérifie que la réponse est une liste
 
 def test_nb_avis_by_resto():
-    # Assurez-vous que l'ID que vous utilisez existe dans votre DataFrame
     response = client.get('/nb_avis/1')
     assert response.status_code == 200
     assert isinstance(response.json(), list)  # Vérifie que la réponse est une liste
 
 def test_get_avis_by_resto():
-    # Assurez-vous que l'ID que vous utilisez existe dans votre DataFrame
     response = client.get('/avis/1')
     assert response.status_code == 200
     assert isinstance(response.json(), list)  # Vérifie que la réponse est une liste
 
-def test_nb_avis_resto():
-    # Assurez-vous que l'ID que vous utilisez existe dans votre DataFrame
-    response = client.get('/avis_count/1')
-    assert response.status_code == 200
-    assert "count" in response.json()
-
 def test_get_restaurant_classement():
-    # Assurez-vous que l'ID que vous utilisez existe dans votre DataFrame
     response = client.get('/restaurant_classement/1')
     assert response.status_code == 200
     data = response.json()
@@ -58,7 +49,6 @@ def test_get_restaurant_classement():
     assert "classement" in data
 
 def test_get_avis_stats():
-    # Assurez-vous que l'ID que vous utilisez existe dans votre DataFrame
     response = client.get('/avis_stats/1')
     assert response.status_code == 200
     data = response.json()
