@@ -5,8 +5,8 @@ services:
                 image: postgres:latest
                 container_name: postgres_container
                 environment:
-                        POSTGRES_USER: dst_projet
-                        POSTGRES_PASSWORD: dst_projet
+                        POSTGRES_USER: ${DB_USER}
+                        POSTGRES_PASSWORD: ${DB_PWD}
                         POSTGRES_DB: postgres
                 volumes:
                         - ~/projet/app/pg_data:/var/lib/postgresql/data
@@ -16,14 +16,46 @@ services:
                         - "5432:5432"
                 networks:
                         - project_network
+                healthcheck:
+                        test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d dst_satisfaction_clients"]
+                        interval: 5s
+                        timeout: 5s
+                        retries: 5
 
         python_load_pg:
                 image: python_load_pg:latest
                 container_name: python_load_pg
                 depends_on:
-                        - postgres
+                        postgres:
+                           condition: service_healthy
                 networks:
                         - project_network
+                environment:
+                       - DB_HOST=postgres
+                       - DB_PORT=${DB_PORT}
+                       - DB_NAME=${DB_NAME}
+                       - DB_USER=${DB_USER}
+                       - DB_PWD=${DB_PWD}
+                volumes:
+                        - ~/projet/app/pg_data:/var/lib/postgresql/data
+                        - ~/projet/app/raw_data:/app/raw_data
+
+        fastapi:
+                image : fastapi_satisfaction_clients:latest
+                container_name : fastapi_satisfaction_clients
+                depends_on:
+                        python_load_pg:
+                                condition: service_started
+                networks:
+                        - project_network
+                environment:
+                        - DB_HOST=postgres
+                        - DB_PORT=${DB_PORT}
+                        - DB_NAME=${DB_NAME}
+                        - DB_USER=${DB_USER}
+                        - DB_PWD=${DB_PWD}
+                ports:
+                        - "8000:8000"
 
 networks:
         project_network:
