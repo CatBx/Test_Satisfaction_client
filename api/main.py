@@ -185,13 +185,7 @@ def get_avis_by_resto(id_resto: int):
     filtered_avis = avis_df[avis_df['id_resto'] == id_resto]
     return filtered_avis.to_dict(orient='records')
 
-# Nombre d'avis pour un restaurant donné
-@api.get("/avis_count/{id_resto}", name="Nombre d'avis pour un restaurant donné", tags=['statistiques'])
-def nb_avis_resto(id_resto: int):
-    filtered_avis = avis_df[avis_df['id_resto'] == id_resto]
-    return {"count": len(filtered_avis)}
-
-@api.get("/restaurant_classement/{id_resto}", response_model=RestaurantRanking)
+@api.get("/restaurant_classement/{id_resto}", response_model=RestaurantRanking, name="Classement d'un restaurant donné", tags=['statistiques'])
 def get_restaurant_classement(id_resto: int):
     if id_resto not in restaurants_df['id_resto'].values:
         raise HTTPException(status_code=404, detail="ID Restaurant inconnu")
