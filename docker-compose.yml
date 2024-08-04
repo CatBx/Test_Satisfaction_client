@@ -56,6 +56,31 @@ services:
                         - DB_PWD=${DB_PWD}
                 ports:
                         - "8000:8000"
+                healthcheck:
+                        test: ["CMD-SHELL", "curl -f http://localhost:8000/nb_restaurants || exit 1"]
+                        interval: 30s
+                        timeout: 10s
+                        retries: 3
+
+        sentiment_analyse:
+                image : analyse_sentiments:latest
+                container_name : analyse_sentiments
+                networks:
+                        - project_network
+                depends_on:
+                        fastapi:
+                                condition: service_healthy
+
+        dash_analyse:
+                image : dash_analyse_avis:latest
+                container_name : dash_analyse_avis
+                depends_on:
+                        fastapi:
+                                condition: service_healthy
+                networks:
+                        - project_network
+                ports:
+                        - "5001:5001"
 
 networks:
         project_network:

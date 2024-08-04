@@ -1,0 +1,4 @@
+pandas
+spacy==3.5.0
+textblob
+requests

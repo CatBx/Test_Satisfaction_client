@@ -1,10 +1,29 @@
+import requests
 import spacy
 import pandas as pd
 from textblob import TextBlob
 nlp = spacy.load("en_core_web_sm")
 
 #chargement des avis
-df_resto = pd.read_csv("/home/ubuntu/projet/output/restaurants_avis.csv", sep ='#', index_col = "Id_Avis")
+#URL de base de l'API FastAPI
+BASE_URL = "http://fastapi:8000"
+print(f"Début de l'analyse ...")
+
+# Récupération de la liste des avis 
+def get_avis():
+    response = requests.get(f"{BASE_URL}/liste_avis")
+    if response.status_code == 200:
+        return pd.DataFrame(response.json())
+    else:
+        return pd.DataFrame()
+
+# Initialisation du DataFrame
+df_avis = get_avis()
+print(f"Nombre d'avis récupérés : {len(df_avis)}")
+print("Colonnes du DataFrame df_avis :", df_avis.columns)
+print(df_avis.head())
+
+# Gestion des synonymes
 synonyms_dict = {
     'price': ['price', 'prices', 'bill', 'cost'],
     'service': ['service', 'services'],
@@ -59,12 +78,30 @@ def extract_negative_nouns(review):
     return list(set(nouns))  # Éliminer les doublons
 
 # Convertir les avis en chaînes de caractères et gérer les valeurs manquantes
-df_resto['Avis'] = df_resto['Avis'].astype(str).fillna('')
+df_avis['avis'] = df_avis['avis'].astype(str).fillna('')
 
 # Application de la fonction sur le DataFrame
-df_resto['positive_points'] = df_resto['Avis'].apply(extract_positive_nouns)
-df_resto['negative_points'] = df_resto['Avis'].apply(extract_negative_nouns)
+df_avis['positive_points'] = df_avis['avis'].apply(extract_positive_nouns)
+df_avis['negative_points'] = df_avis['avis'].apply(extract_negative_nouns)
 
-df_resto.to_csv('/home/ubuntu/projet/output/avis_analyses.csv', sep='#')
+print("Colonnes du DataFrame df_avis après analyse:", df_avis.columns)
+print(df_avis.head())
+
+# Sauvegarde de l'analyse en base 
+print(f"Sauvegarde en base ...")
+df_backup_analyse=df_avis[['id_avis','id_resto','positive_points','negative_points']]
+print(df_backup_analyse.head())
+# Convertir le DataFrame en liste de dictionnaires
+data = df_backup_analyse.to_dict(orient='records')
+dataload = {'data': data}
+#URL de l'API pour backuper les sentiments
+url = "http://fastapi:8000/save_analyses"
+# Envoi de la requête POST
+response = requests.post(url, json=dataload)
+# Check retour
+if response.status_code == 200:
+    print("Données sauvegardées avec succès")
+else:
+    print(f"Erreur {response.status_code}: {response.text}")
 
 

@@ -5,6 +5,7 @@ from typing import List
 from pydantic import BaseModel
 from fastapi import HTTPException
 from fastapi import Request
+import json
 import psycopg2
 import os
 import time
@@ -25,6 +26,7 @@ DB_PWD = os.getenv('DB_PWD')
 #===========================================================================================================================
 restaurants_df = pd.DataFrame()
 avis_df = pd.DataFrame()
+sentiments_df = pd.DataFrame()
 
 #===========================================================================================================================
 # Définition des classes
@@ -58,6 +60,15 @@ class AvisStats(BaseModel):
     nb_note: int
     moyenne: float
     mediane: float
+
+class AnalyseSentiments(BaseModel):
+    id_avis: int
+    id_resto: int
+    positive_points: List[str]
+    negative_points: List[str]
+
+class AnalyseSentimentsList(BaseModel):
+    data: List[AnalyseSentiments]
 
 #===========================================================================================================================
 #Définition des apis
@@ -115,6 +126,18 @@ def clean_dataframe(df):
     df = df.fillna('')  # Remplacer NaN par une chaîne vide pour les colonnes de type string
     return df
 
+def load_sentiments():
+    global sentiments_df
+    conn = get_db_connection()
+    sentiments_query="SELECT id_avis,id_resto,positive_points,negative_points from analyse_sentiments;"
+    sentiments_df = pd.read_sql(sentiments_query, conn)
+
+    # Convertir les colonnes JSON en listes
+    sentiments_df['positive_points'] = sentiments_df['positive_points'].apply(lambda x: json.loads(x) if x else [])
+    sentiments_df['negative_points'] = sentiments_df['negative_points'].apply(lambda x: json.loads(x) if x else [])
+
+    conn.close()
+
 def load_dataframes():
     global restaurants_df, avis_df
     conn = get_db_connection()
@@ -166,6 +189,12 @@ def liste_restaurants():
 def liste_avis():
     return avis_df.to_dict(orient='records')
 
+# Liste des sentiments
+@api.get("/liste_sentiments", response_model=List[AnalyseSentiments], name="Liste des mots clés analysés",tags=['analyse sentiments'])
+def liste_sentiments():
+    load_sentiments()
+    return sentiments_df.to_dict(orient='records')
+
 # Top 10 des restaurants les mieux classés
 @api.get("/top_10_restaurants", response_model=List[Restaurants], name="Top 10 des restaurants les mieux classés", tags=['statistiques'])
 def top_10_restaurants():
@@ -216,5 +245,71 @@ def get_avis_stats(id_resto: int):
     nb_note = filtered_avis['note'].count()
     return AvisStats(nb_note=nb_note, moyenne=moyenne, mediane=mediane)
 
+# fonction de backup pour les analyses de sentiments
+def save_analyse_sentiments_to_db(df: pd.DataFrame):
+    # Convertir les types de données pour être compatibles avec la base de données
+    df['id_avis'] = df['id_avis'].astype(int)
+    df['id_resto'] = df['id_resto'].astype(int)
+    df['positive_points'] = df['positive_points'].apply(lambda x: json.dumps(x) if isinstance(x, list) else x)
+    df['negative_points'] = df['negative_points'].apply(lambda x: json.dumps(x) if isinstance(x, list) else x)
+    print("dans la fonction save_analyse_sentiments_do_db")
+    print(df.dtypes) 
 
+    # Connexion à la base de données
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Définir la commande SQL pour insérer des données
+    insert_query = """
+    INSERT INTO analyse_sentiments (id_avis, id_resto, positive_points, negative_points)
+    VALUES (%s, %s, %s, %s)
+    """
+    try:
+        # Insérer les enregistrements dans la base de données
+        for _, row in df.iterrows():
+            # Conversion explicite en int pour éviter les problèmes avec numpy.int64
+            id_avis = int(row['id_avis'])
+            id_resto = int(row['id_resto'])
+            positive_points = json.dumps(row['positive_points']) if isinstance(row['positive_points'], list) else row['positive_points']
+            negative_points = json.dumps(row['negative_points']) if isinstance(row['negative_points'], list) else row['negative_points']
+            # Exécution de la requête d'insertion
+            cursor.execute(insert_query, (id_avis, id_resto, positive_points, negative_points))
+
+   # try:
+        # Insérer les enregistrements dans la base de données
+    #    for record in records:
+            # Exécution de la requête d'insertion
+            # Conversion explicite en int pour éviter les problèmes avec numpy.int64
+     #       id_avis = int(record.id_avis)
+      #      id_resto = int(record.id_resto)
+       #     positive_points = record.positive_points
+        #    negative_points = record.negative_points
+         #   cursor.execute(insert_query, (id_avis, id_resto, positive_points, negative_points))
+        
+        # Commit les changements
+        conn.commit()
+    except Exception as e:
+        # Rollback en cas d'erreur
+        conn.rollback()
+        print(f"Erreur : {e}")
+
+    finally:
+        # Fermer le curseur et la connexion
+        cursor.close()
+        conn.close()
+
+# Api de backup des analyses de sentiments
+@api.post("/save_analyses", name="Sauvegarde des analyses de sentiments", tags=['analyse sentiments'])
+async def save_analyses(data: AnalyseSentimentsList):
+    try:
+        # Convertir les données JSON en DataFrame ainsi que les int64 en int
+        df = pd.DataFrame([item.dict() for item in data.data])
+
+        # Sauvegarder le DataFrame dans la base de données
+        print("Avant appel a save_analyse_sentiments_to_db")
+        print(df.dtypes)
+        save_analyse_sentiments_to_db(df)
+        return {"message": "Données sauvegardées avec succès"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 

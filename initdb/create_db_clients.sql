@@ -26,4 +26,13 @@ CONSTRAINT pk_id_avis PRIMARY KEY(id_avis),
 CONSTRAINT fk_id_resto FOREIGN KEY(id_resto) REFERENCES restaurants(id_resto)
 );
 
+create table analyse_sentiments(
+	id_avis integer not null,
+	id_resto integer not null,
+	positive_points text,
+	negative_points text,
+CONSTRAINT pk_analyse_sentiments PRIMARY KEY(id_avis),
+CONSTRAINT fk_id_resto FOREIGN KEY(id_resto) REFERENCES restaurants(id_resto),
+CONSTRAINT fk_id_avis FOREIGN KEY(id_avis) REFERENCES avis(id_avis)
+);
 
