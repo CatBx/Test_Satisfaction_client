@@ -2,6 +2,7 @@ import pandas as pd
 import dash
 from dash import dcc, html, dash_table
 from dash.dependencies import Input, Output
+import plotly.graph_objects as go
 import plotly.express as px
 import requests
 
@@ -20,7 +21,21 @@ BASE_URL = "http://fastapi:8000"
 def get_restaurants():
     response = requests.get(f"{BASE_URL}/liste_restaurants")
     if response.status_code == 200:
-        return pd.DataFrame(response.json())
+        df_r=pd.DataFrame(response.json())
+        # on filtre les restaurants à ceux qui disposent d'avis
+        df_r=df_r[df_r['nb_avis'] > 0]
+        return df_r
+    else:
+        return pd.DataFrame()
+
+# Récupération de la liste des avis 
+def get_avis():
+    response = requests.get(f"{BASE_URL}/liste_avis")
+    if response.status_code == 200:
+        df_a= pd.DataFrame(response.json())
+        # on récupère uniquement les avis pour les resto renseignés dans df_restau
+        df_a = df_a[df_a['id_resto'].isin(df_restau['id_resto'])]
+        return df_a
     else:
         return pd.DataFrame()
 
@@ -28,13 +43,18 @@ def get_restaurants():
 def get_sentiments():
     response = requests.get(f"{BASE_URL}/liste_sentiments")
     if response.status_code == 200:
-        return pd.DataFrame(response.json())
+        df_s= pd.DataFrame(response.json())
+        # on récupère uniquement les sentiments pour les resto renseignés dans df_restau
+        df_s = df_s[df_s['id_resto'].isin(df_restau['id_resto'])]
+        return df_s
     else:
         return pd.DataFrame()
 
 # Initialisation des DataFrames
 df_restau = get_restaurants()
+df_avis = get_avis()
 df_sentiments = get_sentiments()
+print(df_sentiments.head())
 
 # Initialisation de l'application Dash
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
@@ -87,6 +107,7 @@ comparatif_layout = html.Div([
         id='resto2-dropdown',
         placeholder='Sélectionnez le deuxième restaurant'
     ),
+    html.Button('Comparer les sentiments', id='compare-button', n_clicks=0),
     html.Div(id='comparatif-table')
 ])
 
@@ -106,7 +127,7 @@ def set_restaurants_options(selected_score):
     else:
         filtered_df = df_restau
 
-    options = [{'label': row['nom'], 'value': row['id_resto']} for _, row in filtered_df.iterrows()]
+    options = [{'label': f"{row['nom']} (Score: {row['score']})", 'value': row['id_resto']} for _, row in filtered_df.iterrows()]
     return options, options
 
 # Callback pour afficher le tableau comparatif
@@ -115,19 +136,65 @@ def set_restaurants_options(selected_score):
     [Input('resto1-dropdown', 'value'),
      Input('resto2-dropdown', 'value')]
 )
-def update_comparatif_table(resto1_id, resto2_id):
-    if resto1_id and resto2_id:
-        resto1 = df_restau[df_restau['id_resto'] == resto1_id]
-        resto2 = df_restau[df_restau['id_resto'] == resto2_id]
 
-        return html.Table([
-            html.Thead(html.Tr([html.Th(col) for col in resto1.columns])),
-            html.Tbody([
-                html.Tr([html.Td(resto1[col].values[0]) for col in resto1.columns]),
-                html.Tr([html.Td(resto2[col].values[0]) for col in resto2.columns])
+def update_comparatif_table(resto1_id, resto2_id):
+    if not resto1_id or not resto2_id:
+                return "Sélectionnez 2 restaurants à comparer."
+
+    # Extraire les données pour chaque restaurant
+    resto1 = df_restau[df_restau['id_resto'] == resto1_id]
+    resto2 = df_restau[df_restau['id_resto'] == resto2_id]
+    resto1_avis = df_avis[df_avis['id_resto'] == resto1_id]
+    resto2_avis = df_avis[df_avis['id_resto'] == resto2_id]
+
+    # Créer le tableau des caractéristiques des restaurants
+    table_char = html.Table([
+        html.Thead(html.Tr([html.Th("Restaurant"), html.Th("Caractéristiques")])),
+        html.Tbody([
+            html.Tr([html.Td(resto1['nom'].values[0]),html.Td(f"Nb Avis: {resto1['nb_avis'].values[0]}"), html.Td(f"Score: {resto1['score'].values[0]}")]),
+            html.Tr([html.Td(resto2['nom'].values[0]),html.Td(f"Nb Avis: {resto2['nb_avis'].values[0]}"), html.Td(f"Score: {resto2['score'].values[0]}")])
             ])
         ])
-    return "Sélectionnez deux restaurants pour comparer."
+
+    # Créer l'histogramme des notes
+    def create_histogram(df, label):
+        hist_data = df['note'].value_counts().sort_index()
+        return go.Bar(
+                x=hist_data.index,
+                y=hist_data.values,
+                name=label
+                )
+
+    # Créer les traces pour les histogrammes
+    fig = go.Figure()
+    fig.add_trace(create_histogram(resto1_avis, resto1['nom'].values[0]))
+    fig.add_trace(create_histogram(resto2_avis, resto2['nom'].values[0]))
+
+    fig.update_layout(
+            barmode='group',
+            title="Distribution des notes entre 1 et 5",
+            xaxis_title="Note",
+            yaxis_title="Nombre d'avis"
+            )
+
+    return html.Div([
+        table_char,
+        html.Br(),
+        dcc.Graph(figure=fig)
+        ])
+
+# Callback pour rediriger vers la page d'analyse avec les restaurants sélectionnés
+@app.callback(
+        Output('url', 'search'),
+        [Input('compare-button', 'n_clicks')],
+        [Input('resto1-dropdown', 'value'),
+            Input('resto2-dropdown', 'value'),
+            Input('score-filter', 'value')]
+        )
+def redirect_to_analysis(n_clicks, resto1_id, resto2_id, selected_score):
+    if n_clicks > 0 and resto1_id and resto2_id:
+        return f'?resto1={resto1_id}&resto2={resto2_id}&score={selected_score}'
+    return dash.no_update
 
 # Layout pour la page d'analyse des avis
 analyse_layout = html.Div([
@@ -153,6 +220,20 @@ analyse_layout = html.Div([
     dcc.Graph(id='avis-graph')
 ])
 
+# Callback pour mettre à jour les dropdowns de l'analyse en fonction des paramètres URL
+@app.callback(
+        [Output('resto-analyse1-dropdown', 'value'),
+            Output('resto-analyse2-dropdown', 'value')],
+        [Input('url', 'search')]
+        )
+def update_analysis_dropdowns(search):
+    if search:
+        params = dict(param.split('=') for param in search[1:].split('&'))
+        resto1_id = params.get('resto1')
+        resto2_id = params.get('resto2')
+        return resto1_id, resto2_id
+    return None, None
+
 # Callback pour mettre à jour les dropdowns de l'analyse
 @app.callback(
     [Output('resto-analyse1-dropdown', 'options'),
@@ -160,7 +241,7 @@ analyse_layout = html.Div([
     [Input('url', 'pathname')]
 )
 def set_analysis_restaurants_options(pathname):
-    options = [{'label': row['nom'], 'value': row['id_resto']} for _, row in df_restau.iterrows()]
+    options = [{'label': f"{row['nom']} (Score: {row['score']})", 'value': row['id_resto']} for _, row in df_restau.iterrows()]
     return options, options
 
 # Callback pour afficher le graphique des avis
@@ -170,28 +251,63 @@ def set_analysis_restaurants_options(pathname):
      Input('resto-analyse2-dropdown', 'value'),
      Input('critere-radio', 'value')]
 )
+
 def update_avis_graph(resto1_id, resto2_id, critere):
     if not resto1_id:
         return {}
     
     def extract_keywords(df, critere_col):
-        keywords = df[critere_col].dropna().str.split(',').explode().str.strip()
+        #suppression du null et transformation en chaine de caractères et en tableau la liste des mots
+        keywords = df[critere_col].dropna().astype(str).loc[df[critere_col].astype(str).str.strip() != ''].str.replace(r"[\[\]']", '', regex=True).str.split(',').explode().str.strip()
+        keywords = keywords[keywords != '']
+        print(keywords.value_counts().head(20))
         return keywords.value_counts().head(20)
 
+    # Création de la figure avec un ou 2 nuages de points selon la sélection
+    fig = go.Figure()
+    
+    # Nuage de points pour le premier restaurant
     resto1_avis = df_sentiments[df_sentiments['id_resto'] == resto1_id]
     resto1_keywords = extract_keywords(resto1_avis, 'positive_points' if critere == 'positifs' else 'negative_points')
 
-    fig = px.scatter(x=resto1_keywords.values, y=resto1_keywords.index, size=resto1_keywords.values, color=resto1_keywords.values, 
-                     color_continuous_scale='Viridis', title=f'Mots-clés pour {df_restau[df_restau["id_resto"] == resto1_id]["nom"].values[0]}')
-    
+    fig.add_trace(go.Scatter(
+        x=resto1_keywords.values,
+        y=resto1_keywords.index,
+        mode='markers',
+        marker=dict(
+            size=resto1_keywords.values,
+            color='blue'  # Couleur fixe pour le restaurant 1
+            ),
+        name=df_restau[df_restau["id_resto"] == resto1_id]["nom"].values[0]
+        ))
+
+    # Ajouter les points pour le deuxième restaurant, si sélectionné
     if resto2_id:
         resto2_avis = df_sentiments[df_sentiments['id_resto'] == resto2_id]
         resto2_keywords = extract_keywords(resto2_avis, 'positive_points' if critere == 'positifs' else 'negative_points')
-        fig.add_scatter(x=resto2_keywords.values, y=resto2_keywords.index, mode='markers', marker=dict(size=resto2_keywords.values, color=resto2_keywords.values), 
-                        name=df_restau[df_restau["id_resto"] == resto2_id]["nom"].values[0])
 
-    fig.update_layout(xaxis_title='Nombre d\'occurrences', yaxis_title='Mot-clé', coloraxis_colorbar=dict(title='Occurrences'))
+        fig.add_trace(go.Scatter(
+            x=resto2_keywords.values,
+            y=resto2_keywords.index,
+            mode='markers',
+            marker=dict(
+                size=resto2_keywords.values,
+                color='red'  # Couleur fixe pour le restaurant 2
+                ),
+            name=df_restau[df_restau["id_resto"] == resto2_id]["nom"].values[0]
+            ))
+
+    
+    # Mise à jour de la mise en page
+    fig.update_layout(
+            title=f"Récurrence des termes utilisés par les clients ayant des connotations {'positifs' if critere == 'positifs' else 'négatifs'}",
+            xaxis_title="Nombre d'occurrences",
+            yaxis_title="Mot-clé",
+            showlegend=True  # Afficher la légende avec les noms des restaurants
+            )
+
     return fig
+
 
 # Lancement de l'application
 if __name__ == '__main__':
