@@ -5,6 +5,7 @@ from typing import List
 from pydantic import BaseModel
 from fastapi import HTTPException
 from fastapi import Request
+from datetime import datetime
 import json
 import psycopg2
 import os
@@ -52,7 +53,7 @@ class Avis(BaseModel):
     note: int
     avis: str
     date_avis: str
-    date_exp: str
+    date_exp: datetime
     reply: str
     date_reply: str
 
