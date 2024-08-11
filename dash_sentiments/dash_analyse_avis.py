@@ -52,7 +52,10 @@ def get_sentiments():
 
 # Initialisation des DataFrames
 df_restau = get_restaurants()
+print(df_restau.head())
 df_avis = get_avis()
+df_avis['date_exp'] = pd.to_datetime(df_avis['date_exp'], errors='coerce')
+print(df_avis.head())
 df_sentiments = get_sentiments()
 print(df_sentiments.head())
 
@@ -93,9 +96,9 @@ comparatif_layout = html.Div([
     dcc.Dropdown(
         id='score-filter',
         options=[
-            {'label': 'MAUVAIS', 'value': 'MAUVAIS'},
-            {'label': 'MOYENS', 'value': 'MOYENS'},
-            {'label': 'BONS', 'value': 'BONS'}
+            {'label': 'MAUVAIS (Score < 2.5)', 'value': 'MAUVAIS'},
+            {'label': 'MOYENS (2.5 <= Score <= 4)', 'value': 'MOYENS'},
+            {'label': 'BONS (Score > 4)', 'value': 'BONS'}
         ],
         placeholder='Filtrer par score'
     ),
@@ -107,8 +110,19 @@ comparatif_layout = html.Div([
         id='resto2-dropdown',
         placeholder='Sélectionnez le deuxième restaurant'
     ),
-    html.Button('Comparer les sentiments', id='compare-button', n_clicks=0),
-    html.Div(id='comparatif-table')
+    html.Br(),
+    #html.Button('Comparer les sentiments', id='compare-button', n_clicks=0),
+    #html.Br(),
+    html.Div(id='comparatif-table'),
+    dcc.RangeSlider(
+        id='date-slider',
+        min=0,
+        max=100,
+        value=[0, 100],
+        marks={},  # Les marques seront mises à jour dynamiquement
+        tooltip={"placement": "bottom", "always_visible": False}
+        ),
+    html.Br()
 ])
 
 # Callback pour mettre à jour les dropdowns selon le filtre de score
@@ -134,18 +148,30 @@ def set_restaurants_options(selected_score):
 @app.callback(
     Output('comparatif-table', 'children'),
     [Input('resto1-dropdown', 'value'),
-     Input('resto2-dropdown', 'value')]
+     Input('resto2-dropdown', 'value'),
+     Input('date-slider', 'value')]
 )
 
-def update_comparatif_table(resto1_id, resto2_id):
+def update_comparatif_table(resto1_id, resto2_id, date_range):
     if not resto1_id or not resto2_id:
-                return "Sélectionnez 2 restaurants à comparer."
+                return "Sélectionnez 2 restaurants à comparer...."
 
     # Extraire les données pour chaque restaurant
     resto1 = df_restau[df_restau['id_resto'] == resto1_id]
     resto2 = df_restau[df_restau['id_resto'] == resto2_id]
     resto1_avis = df_avis[df_avis['id_resto'] == resto1_id]
     resto2_avis = df_avis[df_avis['id_resto'] == resto2_id]
+
+    # dates limites pour le slider
+    min_date = df_avis['date_exp'].min().year
+    max_date = df_avis['date_exp'].max().year
+
+    min_date,max_date=date_range
+
+    # Filtrer les avis selon la plage de dates
+    resto1_avis = df_avis[(df_avis['id_resto'] == resto1_id) & (df_avis['date_exp'].dt.year >= min_date) & (df_avis['date_exp'].dt.year <= max_date)]
+    resto2_avis = df_avis[(df_avis['id_resto'] == resto2_id) & (df_avis['date_exp'].dt.year >= min_date) & (df_avis['date_exp'].dt.year <= max_date)]
+
 
     # Créer le tableau des caractéristiques des restaurants
     table_char = html.Table([
@@ -183,21 +209,53 @@ def update_comparatif_table(resto1_id, resto2_id):
         dcc.Graph(figure=fig)
         ])
 
-# Callback pour rediriger vers la page d'analyse avec les restaurants sélectionnés
+#Callback pour mise a jour du slider
 @app.callback(
-        Output('url', 'search'),
-        [Input('compare-button', 'n_clicks')],
+        [Output('date-slider', 'min'),
+            Output('date-slider', 'max'),
+            Output('date-slider', 'value'),
+            Output('date-slider', 'marks')],
         [Input('resto1-dropdown', 'value'),
-            Input('resto2-dropdown', 'value'),
-            Input('score-filter', 'value')]
+            Input('resto2-dropdown', 'value')]
         )
-def redirect_to_analysis(n_clicks, resto1_id, resto2_id, selected_score):
-    if n_clicks > 0 and resto1_id and resto2_id:
-        return f'?resto1={resto1_id}&resto2={resto2_id}&score={selected_score}'
-    return dash.no_update
+def update_date_slider(resto1_id, resto2_id):
+    if not resto1_id or not resto2_id:
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+                    
+    # Filtrer les avis pour les deux restaurants sélectionnés
+    df_avis_filtered = df_avis[df_avis['id_resto'].isin([resto1_id, resto2_id])]
+
+    # Obtenir les dates minimum et maximum
+    min_date = df_avis_filtered['date_exp'].min().year
+    max_date = df_avis_filtered['date_exp'].max().year
+
+
+    # Créer les marques du slider
+    marks = {year: str(year) for year in range(min_date, max_date + 1)}
+    # Définir les valeurs du slider
+    min_index = 0
+    max_index = len(marks) - 1
+    value = [min_date, max_date+1]
+                
+    #return min_index, max_index, value, marks
+    return min_date, max_date, value, marks
+
+# Callback pour rediriger vers la page d'analyse avec les restaurants sélectionnés
+#@app.callback(
+#        Output('url', 'href'),
+#        [Input('compare-button', 'n_clicks')],
+#        [Input('resto1-dropdown', 'value'),
+#            Input('resto2-dropdown', 'value')
+#            ]
+#        )
+#def redirect_to_analysis(n_clicks, resto1_id, resto2_id):
+#    if n_clicks > 0 and resto1_id and resto2_id:
+#        return f'/analyse?resto1={resto1_id}&resto2={resto2_id}'
+#    return dash.no_update
 
 # Layout pour la page d'analyse des avis
 analyse_layout = html.Div([
+    dcc.Location(id='url-analyse', refresh=True),
     html.H1('Analyse des avis'),
     dcc.Link('Retour à la page principale', href='/'),
     html.Br(),
@@ -220,28 +278,32 @@ analyse_layout = html.Div([
     dcc.Graph(id='avis-graph')
 ])
 
-# Callback pour mettre à jour les dropdowns de l'analyse en fonction des paramètres URL
+# Callback pour mettre à jour les dropdowns de l'analyse 
 @app.callback(
-        [Output('resto-analyse1-dropdown', 'value'),
-            Output('resto-analyse2-dropdown', 'value')],
-        [Input('url', 'search')]
+        [Output('resto-analyse1-dropdown', 'options'),
+            Output('resto-analyse2-dropdown', 'options'),
+   #         Output('resto-analyse1-dropdown', 'value'),
+   #         Output('resto-analyse2-dropdown', 'value')
+        ],
+        [Input('url-analyse', 'pathname')
+         #,   Input('url-analyse', 'search')
+        ]
         )
-def update_analysis_dropdowns(search):
-    if search:
-        params = dict(param.split('=') for param in search[1:].split('&'))
-        resto1_id = params.get('resto1')
-        resto2_id = params.get('resto2')
-        return resto1_id, resto2_id
-    return None, None
-
-# Callback pour mettre à jour les dropdowns de l'analyse
-@app.callback(
-    [Output('resto-analyse1-dropdown', 'options'),
-     Output('resto-analyse2-dropdown', 'options')],
-    [Input('url', 'pathname')]
-)
-def set_analysis_restaurants_options(pathname):
+#def update_analysis_dropdowns_and_options(pathname, search):
+def update_analysis_dropdowns_and_options(pathname):
+    # Mise à jour des options des dropdowns
     options = [{'label': f"{row['nom']} (Score: {row['score']})", 'value': row['id_resto']} for _, row in df_restau.iterrows()]
+
+    #resto1_id=None
+    #resto2_id=None
+
+    # Si des paramètres existent dans l'URL, on les extrait
+    #if search:
+      #  params = dict(param.split('=') for param in search[1:].split('&'))
+      #  resto1_id = params.get('resto1')
+      #  resto2_id = params.get('resto2')
+
+    #return options, options, resto1_id, resto2_id
     return options, options
 
 # Callback pour afficher le graphique des avis
@@ -298,7 +360,7 @@ def update_avis_graph(resto1_id, resto2_id, critere):
             ))
 
     
-    # Mise à jour de la mise en page
+    # mise en page
     fig.update_layout(
             title=f"Récurrence des termes utilisés par les clients ayant des connotations {'positifs' if critere == 'positifs' else 'négatifs'}",
             xaxis_title="Nombre d'occurrences",
