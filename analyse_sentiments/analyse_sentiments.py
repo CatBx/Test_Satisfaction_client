@@ -2,7 +2,55 @@ import requests
 import spacy
 import pandas as pd
 from textblob import TextBlob
+import nltk
+from nltk.data import find
 nlp = spacy.load("en_core_web_sm")
+
+# répertoire des données NLTK
+nltk.data.path.append('/usr/local/nltk_data')
+
+
+# Vérification et téléchargement du corpus 'punkt' et 'punkt_tab'
+try:
+    find('tokenizers/punkt')
+    print("Le corpus 'punkt' est déjà téléchargé.")
+except LookupError:
+    print("Le corpus 'punkt' n'est pas présent. Téléchargement en cours...")
+    nltk.download('punkt')
+
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+    print("Le corpus 'punkt_tab' est déjà téléchargé.")
+except LookupError:
+    print("Le corpus 'punkt_tab' n'est pas présent. Téléchargement en cours...")
+    nltk.download('punkt_tab')
+
+
+
+# Vérifier que les ressources TextBlob sont installées
+def check_textblob_resources():
+    from textblob import Word
+    try:
+        # Création d'un simple objet Word pour vérifier les données
+        word = Word("example")
+        print("Les corpus TextBlob sont présents.")
+    except Exception as e:
+        print(f"Erreur avec TextBlob: {e}")
+        # Tenter de télécharger les données de TextBlob si nécessaire
+        import subprocess
+        subprocess.run(["python3", "-m", "textblob.download_corpora"], check=True)
+
+check_textblob_resources()
+
+#Textblob fonctionne ?
+text = "This is a test sentence to verify TextBlob functionality."
+blob = TextBlob(text)
+print("Sentences:", blob.sentences)
+#Spacy fonctionne ?
+doc = nlp("This is a test sentence.")
+print("Tokens:", [token.text for token in doc])
+
+
 
 #chargement des avis
 #URL de base de l'API FastAPI

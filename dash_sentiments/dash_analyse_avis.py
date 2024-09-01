@@ -44,6 +44,8 @@ def get_sentiments():
     response = requests.get(f"{BASE_URL}/liste_sentiments")
     if response.status_code == 200:
         df_s= pd.DataFrame(response.json())
+        print(df_s.head())
+        print(df_restau.head())
         # on récupère uniquement les sentiments pour les resto renseignés dans df_restau
         df_s = df_s[df_s['id_resto'].isin(df_restau['id_resto'])]
         return df_s

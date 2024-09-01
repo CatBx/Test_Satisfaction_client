@@ -12,9 +12,16 @@ COPY ./requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
 # Téléchargement du modèle Spacy
 RUN python3 load_spacy.py
+
+# chemin spécifique pour nltk_data
+ENV NLTK_DATA="/usr/local/nltk_data"
+
+# Télécharger les corpus TextBlob et NLTK nécessaires
+RUN python3 -c "import nltk; nltk.download('punkt', download_dir='/usr/local/nltk_data')"
+RUN python3 -c "import nltk; nltk.download('punkt_tab', download_dir='/usr/local/nltk_data')"
+
 # Télécharger les corpus TextBlob nécessaires
-RUN python -m textblob.download_corpora
+RUN python3 -m textblob.download_corpora
 
-CMD python3 analyse_sentiments.py
-
+CMD ["python3", "analyse_sentiments.py"]
 

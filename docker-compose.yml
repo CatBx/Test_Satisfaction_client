@@ -23,7 +23,7 @@ services:
                         retries: 5
 
         python_load_pg:
-                image: python_load_pg:latest
+                image: cat33/python_load_pg:latest
                 container_name: python_load_pg
                 depends_on:
                         postgres:
@@ -41,7 +41,7 @@ services:
                         - ~/projet/app/raw_data:/app/raw_data
 
         fastapi:
-                image : fastapi_satisfaction_clients:latest
+                image : cat33/fastapi_satisfaction_clients:latest
                 container_name : fastapi_satisfaction_clients
                 depends_on:
                         python_load_pg:
@@ -62,8 +62,8 @@ services:
                         timeout: 10s
                         retries: 3
 
-        sentiment_analyse:
-                image : analyse_sentiments:latest
+        analyse_sentiments:
+                image : cat33/analyse_sentiments:latest
                 container_name : analyse_sentiments
                 networks:
                         - project_network
@@ -72,7 +72,7 @@ services:
                                 condition: service_healthy
 
         dash_analyse:
-                image : dash_analyse_avis:latest
+                image : cat33/dash_analyse_avis:latest
                 container_name : dash_analyse_avis
                 depends_on:
                         fastapi:
